@@ -1,8 +1,8 @@
 # Never Sleep
 
-A tiny Windows app that keeps your laptop awake while it is running, with an optional keep-screen-on toggle.
+A Windows app that keeps your laptop awake while it is running, with an optional keep-screen-on toggle.
 
-برنامج صغير لويندوز يخلّي اللابتوب ميتقفلش طول ما هو شغّال، مع اختيار يخلّي الشاشة شغالة كمان.
+برنامج ويندوز يخلّي اللابتوب ميتقفلش طول ما هو شغّال، مع اختيار يخلّي الشاشة شغالة كمان.
 
 ## Download / التحميل
 
