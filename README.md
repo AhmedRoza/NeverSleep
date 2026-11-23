@@ -1,52 +1,58 @@
+<div align="center">
+
 # Never Sleep
 
-A Windows app that keeps your laptop awake while it is running, with an optional keep-screen-on toggle.
+**Keeps your Windows laptop awake while it is switched on. Small, quiet, and easy on the eyes.**
 
-برنامج ويندوز يخلّي اللابتوب ميتقفلش طول ما هو شغّال، مع اختيار يخلّي الشاشة شغالة كمان.
+برنامج ويندوز صغير وهادي يخلّي اللابتوب صاحي طول ما إنت عايز.
 
-## Download / التحميل
+<img src="docs/screenshots/app-main.png" width="300" alt="Never Sleep main window"> &nbsp; <img src="docs/screenshots/app-contact.png" width="300" alt="Never Sleep Contact tab">
 
-Grab the latest installer from [Releases](../../releases).
-
-حمّل أحدث نسخة من صفحة [Releases](../../releases).
+</div>
 
 ## Features / المميزات
 
-- One-click sleep prevention - the app starts paused and remembers your choices
-  - منع السكون بزرار واحد — البرنامج بيفتح متوقف وبيفتكر اختياراتك
-- Optional keep-screen-on mode
-  - إبقاء الشاشة شغالة كمان (اختياري)
-- Run duration: until stopped, 1 hour, 2 hours, 4 hours, or a custom duration in hours and minutes with a remaining-time countdown
-  - مدة التشغيل: حتى الإيقاف، ساعة، ساعتين، ٤ ساعات، أو مدة مخصصة بالساعات والدقائق مع عدّاد متبقي
-- "On charger only" option stops prevention automatically on battery
-  - اختيار "على الشاحن بس" يوقّف المنع تلقائيًا على البطارية
-- System tray mode with a status indicator, and a "Stop and exit" button that restores normal sleep settings
-  - تصغير جنب الساعة (system tray) مع مؤشر حالة، وزر "إيقاف وخروج" يرجّع إعدادات السكون الطبيعية
-- Optional start with Windows, opens next to the clock
-  - تشغيل تلقائي مع ويندوز (اختياري) — يفتح جنب الساعة
-- Quick duration selection from the tray menu
-  - اختيار المدة السريع من قائمة الأيقونة جنب الساعة
-- The app does not bypass the security lock or lid-close behavior - it only prevents idle sleep
-  - التطبيق مبيعدّيش قفل الأمان ولا إغلاق الغطا — بيمنع سكون الخمول بس
+- **One tap to keep awake** with a single animated power button. The app starts switched off and remembers your choices. / زرار واحد لمنع السكون، والبرنامج بيفتح متوقف.
+- **Keep the screen on too** (optional). / إبقاء الشاشة شغالة كمان (اختياري).
+- **Timer**: until stopped, 1, 2 or 4 hours, or any custom hours and minutes, with a live countdown. / مدة جاهزة أو مخصصة بعدّاد متبقي.
+- **Running-time counter**: shows how long keep-awake has been on (can be turned off). / عدّاد بيوريك بقاله شغال قد إيه.
+- **Dark AMOLED or white mode**, and a **custom accent color**. / وضع داكن AMOLED أو أبيض، ولون تمييز تغيّره.
+- **Starts with Windows quietly**: opens in the tray by the clock, with no window. / يفتح مع ويندوز في الخلفية جنب الساعة من غير نافذة.
+- **Tray menu**: open, start/stop, quick duration, start with Windows, stop and exit. / قائمة جنب الساعة.
+- **On charger only** option stops keeping the PC awake when the charger is unplugged. / على الشاحن بس.
+- **Automatic updates from GitHub Releases** (can be switched off). / تحديث تلقائي من GitHub (ممكن توقفه).
+- **Contact tab** (∞) with the developer's photo, Instagram and WhatsApp. / قسم Contact.
+
+> **Status:** 2.0 is a first build. It was tested on a GitHub-hosted Windows VM (not a physical laptop). There, the tray, the WebView2 window, the keep-awake request (seen in `powercfg`), theme switching, a fresh install, quiet background start when the Start with Windows command was replayed (not a real Windows logon), the update swap with restart, rejection of a download with a wrong checksum, rollback of an update that failed to start, and migration from a simulated v1 install (settings kept, backup made) all worked. The final layout check and the migration check ran on the final build. The update, install and background tests ran on the previous build, which has identical program code and differs only in window layout. Not tested: a real reboot or Windows logon, real sleep or lid close on a laptop, SmartScreen, other DPI or very small window sizes, and laptop battery or CPU use. Screenshots in this README are mocked-state renders. The Contact tab label is English in the Arabic interface. Please report problems.
+
+Never Sleep is designed to prevent only *idle* sleep. It is not meant to bypass the lock screen, lid-close behavior, or any Windows power or security policy. / بيمنع سكون الخمول بس، ومبيعدّيش قفل الشاشة ولا إغلاق الغطا.
 
 ## Install / التثبيت
 
-Run `Never Sleep Setup 1.3.0.exe` and choose the install location. The app is not digitally signed, so Windows may show a protection prompt; if you get one, send me a screenshot first.
+1. Download `NeverSleep.exe` from [Releases](../../releases).
+2. Run it. It installs itself for your user (no admin needed) and adds a Start Menu and Desktop shortcut.
+3. The app is not code-signed, so Windows may show a SmartScreen prompt on first run.
 
-شغّل `Never Sleep Setup 1.3.0.exe` واختار مكان التثبيت. البرنامج غير موقّع رقميًا، فممكن يظهر تنبيه حماية من Windows؛ لو ظهرلك أي تنبيه ابعتلي صورته الأول.
+If you have the older v1.x (Electron) version, the installer asks before touching it. The old folder is moved to a backup folder next to it and your settings are kept.
 
-## Build from source / البناء من السورس
+Needs the Microsoft Edge **WebView2 runtime** for the window (included with Windows 11 and most up-to-date Windows 10). If it is missing, the app shows a message telling you to install it from Microsoft; the tray part still runs.
+
+## Updates / التحديثات
+
+When *Automatic updates* is on, the app is designed to check this repository's latest release every few hours. A new build must be a newer version with a `NeverSleep.exe` and a matching `NeverSleep.exe.sha256` file. It is installed only while keep-awake is off, and the previous build is kept as `Never Sleep.exe.old` so a failing update can roll back (rollback of an update that failed to start was tested on a Windows VM).
+
+Note: the checksum only catches broken or mismatched downloads. It does not prove who published the file. Anyone who can publish a release on this GitHub account could push code to installed copies, so updates are only as trustworthy as that account. The builds are not code-signed. Turn the option off in the app if you prefer manual updates.
+
+## Build from source
 
 ```bash
-npm install
-npm test            # logic unit tests
-npx electron-builder --win nsis   # needs wine on Linux for the installer step
+./build.sh   # needs Go 1.22+, produces NeverSleep.exe and NeverSleep.exe.sha256
 ```
 
-## Tech / التقنية
+## How it is built
 
-Electron (Windows, NSIS installer), no backend, settings stored locally.
+Go with a small native tray and power host. The window is a separate WebView2 process that only exists while the window is open, so the tray part stays tiny. Settings are stored in `%APPDATA%\neversleep\settings.json`.
 
 ## Credits
 
-Ahmed Roza — [Instagram](https://www.instagram.com/ahmed_roza_) · [WhatsApp](https://wa.me/201095064150)
+Ahmed Roza · [Instagram](https://www.instagram.com/ahmed_roza_) · [WhatsApp](https://wa.me/201095064150)

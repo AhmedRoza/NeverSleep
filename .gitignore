@@ -1,0 +1,4 @@
+*.exe
+*.syso
+dist/
+node_modules/
