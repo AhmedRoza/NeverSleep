@@ -81,6 +81,22 @@ func runUI(port, token string) {
 	})
 	w.Bind("nsToggle", func() { call("/toggle") })
 	w.Bind("nsDuration", func(m int) { call(fmt.Sprintf("/duration?m=%d", m)) })
+	w.Bind("nsUntil", func(t string) { call("/until?t=" + url.QueryEscape(t)) })
+	w.Bind("nsDevices", func() ([]Device, error) {
+		s, err := call("/devices")
+		if err != nil {
+			return []Device{}, err
+		}
+		var l []Device
+		if err = json.Unmarshal([]byte(s), &l); err != nil {
+			return []Device{}, err
+		}
+		if l == nil {
+			l = []Device{}
+		}
+		return l, nil
+	})
+	w.Bind("nsUpdateCheck", func() { call("/updatecheck") })
 	w.Bind("nsSet", func(k string, v bool) {
 		n := "0"
 		if v {

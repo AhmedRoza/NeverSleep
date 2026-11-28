@@ -25,11 +25,15 @@ func main() {
 		return
 	}
 	if hasArg("--selftest") {
-		// used by the updater before it trusts a downloaded build: settings load + power request round trip
+		// used by the updater before it trusts a downloaded build: settings load + power request round trip.
+		// The battery and device readers run too, so a build whose new system calls crash would be
+		// rejected here instead of after it replaced the working copy.
 		_ = LoadSettings(settingsPath())
 		if !powerSelfTest() {
 			os.Exit(2)
 		}
+		_ = readBattery()
+		_ = devicesCached()
 		println2("NeverSleep " + Version + " ok")
 		return
 	}

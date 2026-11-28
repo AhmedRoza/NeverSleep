@@ -51,38 +51,39 @@ func updaterLoop() {
 	}
 }
 
-func checkForUpdate() {
+func checkForUpdate() bool {
 	if !runningInstalled() {
-		return
+		return false
 	}
 	body, err := httpGet("https://api.github.com/repos/"+Repo+"/releases/latest", 1<<20)
 	if err != nil {
-		return // offline or rate limited: stay quiet, retry later
+		return false // offline or rate limited: stay quiet, retry later
 	}
 	tag, exe, err := PlanUpdate(body, Version, httpGet)
 	if err != nil {
-		return
+		return false
 	}
 	_ = os.MkdirAll(updateDir(), 0o755)
 	tmp := filepath.Join(updateDir(), "new.exe.part")
 	final := filepath.Join(updateDir(), "new.exe")
 	if os.WriteFile(tmp, exe, 0o755) != nil {
-		return
+		return false
 	}
 	// The candidate must run and report exactly the version it claims before it can replace us.
 	if !selftestOK(tmp, tag) {
 		_ = os.Remove(tmp)
-		return
+		return false
 	}
 	_ = os.WriteFile(filepath.Join(updateDir(), "new.ver"), []byte(tag), 0o644)
 	if os.Rename(tmp, final) != nil {
-		return
+		return false
 	}
 	eng.mu.Lock()
 	eng.pendingUpd = final
 	eng.updateMsg = "تحديث " + tag + " جاهز، هيتركّب أول ما منع السكون يبقى متوقف"
 	eng.mu.Unlock()
 	eng.poke()
+	return true
 }
 
 // selftestOK runs "<exe> --selftest" with a timeout and expects "NeverSleep <tag-without-v> ok".

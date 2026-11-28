@@ -29,39 +29,32 @@ const (
 )
 
 var (
-	kernel32              = windows.NewLazySystemDLL("kernel32.dll")
-	procSetThreadExec     = kernel32.NewProc("SetThreadExecutionState")
-	procGetSystemPowerSts = kernel32.NewProc("GetSystemPowerStatus")
+	kernel32          = windows.NewLazySystemDLL("kernel32.dll")
+	procSetThreadExec = kernel32.NewProc("SetThreadExecutionState")
+	procTickCount64   = kernel32.NewProc("GetTickCount64")
 )
 
-type powerStatus struct {
-	ACLineStatus        byte
-	BatteryFlag         byte
-	BatteryLifePercent  byte
-	SystemStatusFlag    byte
-	BatteryLifeTime     uint32
-	BatteryFullLifeTime uint32
-}
-
-func onBattery() bool {
-	var p powerStatus
-	r, _, _ := procGetSystemPowerSts.Call(uintptr(unsafe.Pointer(&p)))
-	return r != 0 && p.ACLineStatus == 0
+// uptimeSeconds is how long Windows has been running, straight from the kernel counter.
+func uptimeSeconds() int64 {
+	r, _, _ := procTickCount64.Call()
+	return int64(r)
 }
 
 type Engine struct {
-	mu         sync.Mutex
-	s          Settings
-	active     bool
-	startedAt  time.Time
-	endsAt     time.Time // zero = until stopped
-	updateMsg  string
-	pendingUpd string // path of a verified, downloaded update waiting to be applied
-	powerCh    chan [2]bool
-	wake       chan struct{}
-	token      string
-	port       int
-	uiCmd      *exec.Cmd
+	mu          sync.Mutex
+	s           Settings
+	active      bool
+	startedAt   time.Time
+	endsAt      time.Time // zero = until stopped
+	updateMsg   string
+	pendingUpd  string // path of a verified, downloaded update waiting to be applied
+	smartIn     bool   // inside the smart-sleep window right now
+	smartPaused bool   // smart sleep turned keep-awake off; cleared by the next manual start
+	powerCh     chan [2]bool
+	wake        chan struct{}
+	token       string
+	port        int
+	uiCmd       *exec.Cmd
 }
 
 var eng *Engine
@@ -72,6 +65,7 @@ func settingsPath() string {
 
 func newEngine() *Engine {
 	e := &Engine{s: LoadSettings(settingsPath()), powerCh: make(chan [2]bool, 4), wake: make(chan struct{}, 1)}
+	e.smartIn = e.s.SmartSleep && InWindow(time.Now(), e.s.SmartFrom, e.s.SmartTo)
 	go e.powerWorker()
 	go e.loop()
 	return e
@@ -171,7 +165,7 @@ func (e *Engine) powerWorker() {
 }
 
 func (e *Engine) applyPowerLocked() {
-	sys, disp := Wanted(e.active, e.s, onBattery())
+	sys, disp := Wanted(e.active, e.s, !readBattery().OnAC)
 	select {
 	case e.powerCh <- [2]bool{sys, disp}:
 	default:
@@ -186,23 +180,47 @@ func (e *Engine) applyPowerLocked() {
 	}
 }
 
+// loop is the only timer in the app. It sleeps 20 s while idle and wakes exactly when a
+// countdown ends, so a switched-off app costs almost nothing.
 func (e *Engine) loop() {
-	t := time.NewTicker(5 * time.Second)
 	for {
+		e.mu.Lock()
+		active, ends := e.active, e.endsAt
+		e.mu.Unlock()
+		d := 20 * time.Second
+		if active && !ends.IsZero() {
+			d = time.Until(ends) + 150*time.Millisecond
+			if d < 250*time.Millisecond {
+				d = 250 * time.Millisecond
+			}
+		}
 		select {
-		case <-t.C:
+		case <-time.After(d):
 		case <-e.wake:
 		}
-		e.mu.Lock()
-		if e.active && !e.endsAt.IsZero() && !time.Now().Before(e.endsAt) {
-			e.active = false
-			e.endsAt = time.Time{}
-		}
-		e.applyPowerLocked()
-		e.mu.Unlock()
+		e.tick()
 		trayRefresh()
 		maybeApplyUpdate()
 	}
+}
+
+// tick applies the clock: smart-sleep window, countdown end, power requests.
+func (e *Engine) tick() {
+	now := time.Now()
+	e.mu.Lock()
+	in := e.s.SmartSleep && InWindow(now, e.s.SmartFrom, e.s.SmartTo)
+	if in && !e.smartIn && e.active {
+		e.active = false
+		e.endsAt = time.Time{}
+		e.smartPaused = true
+	}
+	e.smartIn = in
+	if e.active && !e.endsAt.IsZero() && !now.Before(e.endsAt) {
+		e.active = false
+		e.endsAt = time.Time{}
+	}
+	e.applyPowerLocked()
+	e.mu.Unlock()
 }
 
 func (e *Engine) poke() {
@@ -214,6 +232,19 @@ func (e *Engine) poke() {
 
 func (e *Engine) save() { _ = SaveSettings(settingsPath(), e.s) }
 
+// endForLocked is when a start should end: the until-clock if that mode is on, else the duration.
+func (e *Engine) endForLocked(now time.Time) time.Time {
+	if e.s.TimerMode == "until" {
+		if t, ok := NextClock(now, e.s.UntilTime); ok {
+			return t
+		}
+	}
+	if e.s.DurationMinutes > 0 {
+		return now.Add(time.Duration(e.s.DurationMinutes) * time.Minute)
+	}
+	return time.Time{}
+}
+
 func (e *Engine) Toggle() {
 	e.mu.Lock()
 	if e.active {
@@ -221,10 +252,9 @@ func (e *Engine) Toggle() {
 		e.endsAt = time.Time{}
 	} else {
 		e.active = true
+		e.smartPaused = false
 		e.startedAt = time.Now()
-		if e.s.DurationMinutes > 0 {
-			e.endsAt = e.startedAt.Add(time.Duration(e.s.DurationMinutes) * time.Minute)
-		}
+		e.endsAt = e.endForLocked(e.startedAt)
 	}
 	e.applyPowerLocked()
 	e.mu.Unlock()
@@ -237,6 +267,8 @@ func (e *Engine) SetDuration(m int) {
 	}
 	e.mu.Lock()
 	e.s.DurationMinutes = m
+	e.s.TimerMode = "duration"
+	e.smartPaused = false
 	if e.active {
 		if m > 0 {
 			e.endsAt = time.Now().Add(time.Duration(m) * time.Minute)
@@ -247,6 +279,32 @@ func (e *Engine) SetDuration(m int) {
 	e.save()
 	e.mu.Unlock()
 	trayRefresh()
+	e.poke()
+}
+
+// SetUntil switches to "awake until HH:MM" and starts keep-awake if it is off.
+func (e *Engine) SetUntil(clock string) bool {
+	if !ValidClock(clock) {
+		return false
+	}
+	now := time.Now()
+	end, ok := NextClock(now, clock)
+	if !ok {
+		return false
+	}
+	e.mu.Lock()
+	e.s.UntilTime = clock
+	e.s.TimerMode = "until"
+	e.smartPaused = false
+	e.active = true
+	e.startedAt = now
+	e.endsAt = end
+	e.save()
+	e.applyPowerLocked()
+	e.mu.Unlock()
+	trayRefresh()
+	e.poke()
+	return true
 }
 
 func (e *Engine) SetPref(k, v string) {
@@ -256,9 +314,20 @@ func (e *Engine) SetPref(k, v string) {
 		e.s.Theme = v
 	case k == "accent" && ValidAccent(v):
 		e.s.Accent = strings.ToLower(v)
+	case k == "untilTime" && ValidClock(v):
+		e.s.UntilTime = v
+	case k == "timerMode" && ValidTimerMode(v):
+		e.s.TimerMode = v
+	case k == "smartFrom" && ValidClock(v):
+		e.s.SmartFrom = v
+		e.smartIn = e.s.SmartSleep && InWindow(time.Now(), e.s.SmartFrom, e.s.SmartTo)
+	case k == "smartTo" && ValidClock(v):
+		e.s.SmartTo = v
+		e.smartIn = e.s.SmartSleep && InWindow(time.Now(), e.s.SmartFrom, e.s.SmartTo)
 	}
 	e.save()
 	e.mu.Unlock()
+	e.poke()
 }
 
 func (e *Engine) SetFlag(k string, v bool) {
@@ -275,6 +344,14 @@ func (e *Engine) SetFlag(k string, v bool) {
 	case "autoStart":
 		e.s.AutoStart = v
 		setRunKey(v)
+	case "smartSleep":
+		e.s.SmartSleep = v
+		e.smartIn = v && InWindow(time.Now(), e.s.SmartFrom, e.s.SmartTo)
+		if !v {
+			e.smartPaused = false
+		}
+	case "hoverInfo":
+		e.s.HoverInfo = v
 	}
 	e.save()
 	e.applyPowerLocked()
@@ -282,33 +359,74 @@ func (e *Engine) SetFlag(k string, v bool) {
 	if k == "autoUpdate" && v {
 		go checkForUpdate()
 	}
+	if k == "hoverInfo" && !v {
+		tipShow(false)
+	}
 	trayRefresh()
+	e.poke()
+}
+
+// CheckUpdate is the "check now" button: it reports back even when there is nothing new.
+func (e *Engine) CheckUpdate() {
+	if !runningInstalled() {
+		e.setMsg("التحديث التلقائي شغال من النسخة المتثبتة بس")
+		return
+	}
+	e.setMsg("بيشيّك على تحديث…")
+	go func() {
+		if !checkForUpdate() {
+			e.setMsg("إنت على آخر نسخة (v" + Version + ")")
+			time.AfterFunc(8*time.Second, func() {
+				e.mu.Lock()
+				if strings.HasPrefix(e.updateMsg, "إنت على آخر نسخة") {
+					e.updateMsg = ""
+				}
+				e.mu.Unlock()
+				trayRefresh()
+			})
+		}
+	}()
 }
 
 type StateJSON struct {
-	Active        bool   `json:"active"`
-	KeepScreen    bool   `json:"keepScreen"`
-	ShowElapsed   bool   `json:"showElapsed"`
-	AcOnly        bool   `json:"acOnly"`
-	AutoStart     bool   `json:"autoStart"`
-	AutoUpdate    bool   `json:"autoUpdate"`
-	DurationMin   int    `json:"durationMin"`
-	StartedAt     int64  `json:"startedAt"`
-	EndsAt        int64  `json:"endsAt"`
-	PausedBattery bool   `json:"pausedBattery"`
-	Theme         string `json:"theme"`
-	Accent        string `json:"accent"`
-	Version       string `json:"version"`
-	UpdateMsg     string `json:"updateMsg"`
+	Active        bool        `json:"active"`
+	KeepScreen    bool        `json:"keepScreen"`
+	ShowElapsed   bool        `json:"showElapsed"`
+	AcOnly        bool        `json:"acOnly"`
+	AutoStart     bool        `json:"autoStart"`
+	AutoUpdate    bool        `json:"autoUpdate"`
+	DurationMin   int         `json:"durationMin"`
+	StartedAt     int64       `json:"startedAt"`
+	EndsAt        int64       `json:"endsAt"`
+	PausedBattery bool        `json:"pausedBattery"`
+	Theme         string      `json:"theme"`
+	Accent        string      `json:"accent"`
+	Version       string      `json:"version"`
+	UpdateMsg     string      `json:"updateMsg"`
+	Battery       BatteryInfo `json:"battery"`
+	UptimeSecs    int64       `json:"uptimeSecs"`
+	TimerMode     string      `json:"timerMode"`
+	UntilTime     string      `json:"untilTime"`
+	SmartSleep    bool        `json:"smartSleep"`
+	SmartFrom     string      `json:"smartFrom"`
+	SmartTo       string      `json:"smartTo"`
+	SmartOn       bool        `json:"smartOn"`
+	SmartPaused   bool        `json:"smartPaused"`
+	HoverInfo     bool        `json:"hoverInfo"`
 }
 
 func (e *Engine) Snapshot() StateJSON {
-	bat := onBattery()
+	bat := readBattery()
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	st := StateJSON{Active: e.active, KeepScreen: e.s.KeepScreenOn, ShowElapsed: e.s.ShowElapsed, AcOnly: e.s.AcOnly,
-		AutoStart: e.s.AutoStart, AutoUpdate: e.s.AutoUpdate, DurationMin: e.s.DurationMinutes, Version: Version, Theme: e.s.Theme, Accent: e.s.Accent,
-		UpdateMsg: e.updateMsg, PausedBattery: e.active && e.s.AcOnly && bat}
+		AutoStart: e.s.AutoStart, AutoUpdate: e.s.AutoUpdate, DurationMin: e.s.DurationMinutes, Version: Version,
+		Theme: e.s.Theme, Accent: e.s.Accent, UpdateMsg: e.updateMsg,
+		PausedBattery: e.active && e.s.AcOnly && !bat.OnAC,
+		Battery:       bat, UptimeSecs: uptimeSeconds(),
+		TimerMode: e.s.TimerMode, UntilTime: e.s.UntilTime,
+		SmartSleep: e.s.SmartSleep, SmartFrom: e.s.SmartFrom, SmartTo: e.s.SmartTo,
+		SmartOn: e.smartIn, SmartPaused: e.smartPaused, HoverInfo: e.s.HoverInfo}
 	if e.active {
 		st.StartedAt = e.startedAt.Unix()
 		if !e.endsAt.IsZero() {
@@ -322,6 +440,7 @@ func (e *Engine) setMsg(m string) {
 	e.mu.Lock()
 	e.updateMsg = m
 	e.mu.Unlock()
+	trayRefresh()
 }
 
 // Quit releases every power request so Windows sleeps normally again, then exits.
@@ -340,6 +459,7 @@ func (e *Engine) Quit() {
 	default:
 	}
 	time.Sleep(300 * time.Millisecond)
+	tipShow(false)
 	trayRemove()
 	os.Exit(0)
 }
@@ -368,16 +488,26 @@ func (e *Engine) serve() error {
 	mux.HandleFunc("/state", auth(func(w http.ResponseWriter, r *http.Request) {
 		json.NewEncoder(w).Encode(e.Snapshot())
 	}))
+	mux.HandleFunc("/devices", auth(func(w http.ResponseWriter, r *http.Request) {
+		json.NewEncoder(w).Encode(devicesCached())
+	}))
 	mux.HandleFunc("/toggle", auth(func(w http.ResponseWriter, r *http.Request) { e.Toggle(); w.Write([]byte("ok")) }))
 	mux.HandleFunc("/duration", auth(func(w http.ResponseWriter, r *http.Request) {
 		m, _ := strconv.Atoi(r.URL.Query().Get("m"))
 		e.SetDuration(m)
 		w.Write([]byte("ok"))
 	}))
+	mux.HandleFunc("/until", auth(func(w http.ResponseWriter, r *http.Request) {
+		if !e.SetUntil(r.URL.Query().Get("t")) {
+			http.Error(w, "bad time", 400)
+			return
+		}
+		w.Write([]byte("ok"))
+	}))
 	mux.HandleFunc("/flag", auth(func(w http.ResponseWriter, r *http.Request) {
 		k := r.URL.Query().Get("k")
 		switch k {
-		case "keepScreen", "acOnly", "showElapsed", "autoUpdate", "autoStart":
+		case "keepScreen", "acOnly", "showElapsed", "autoUpdate", "autoStart", "smartSleep", "hoverInfo":
 			e.SetFlag(k, r.URL.Query().Get("v") == "1")
 		}
 		w.Write([]byte("ok"))
@@ -386,12 +516,13 @@ func (e *Engine) serve() error {
 		e.SetPref(r.URL.Query().Get("k"), r.URL.Query().Get("v"))
 		w.Write([]byte("ok"))
 	}))
+	mux.HandleFunc("/updatecheck", auth(func(w http.ResponseWriter, r *http.Request) { e.CheckUpdate(); w.Write([]byte("ok")) }))
 	mux.HandleFunc("/quit", auth(func(w http.ResponseWriter, r *http.Request) { w.Write([]byte("ok")); go e.Quit() }))
 	go http.Serve(ln, mux)
 	return nil
 }
 
-func (e *Engine) ShowUI(extra ...string) {
+func (e *Engine) ShowUI() {
 	e.mu.Lock()
 	defer e.mu.Unlock()
 	if e.uiCmd != nil {

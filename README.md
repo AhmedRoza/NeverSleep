@@ -1,58 +1,97 @@
-<div align="center">
+<p align="center">
+  <img src="docs/banner.gif" alt="Never Sleep" width="100%">
+</p>
 
 # Never Sleep
 
-**Keeps your Windows laptop awake while it is switched on. Small, quiet, and easy on the eyes.**
+**A small, quiet Windows tray app that keeps your laptop awake for exactly as long as you want.** One portable executable, no account, almost no footprint while it runs.
 
-برنامج ويندوز صغير وهادي يخلّي اللابتوب صاحي طول ما إنت عايز.
+[![Windows](https://img.shields.io/badge/Windows-10%20%7C%2011-0078D6?style=flat-square&logo=windows11&logoColor=white)](https://github.com/AhmedRoza/NeverSleep/releases/latest)
+[![Go](https://img.shields.io/badge/Go-native%20tray-00ADD8?style=flat-square&logo=go&logoColor=white)](#how-it-is-built)
+[![WebView2](https://img.shields.io/badge/UI-WebView2-0f7b6c?style=flat-square)](#install)
+[![Size](https://img.shields.io/badge/size-7.6%20MB-7c5cff?style=flat-square)](#install)
+[![Version](https://img.shields.io/badge/version-v2.1.1-ff4d6d?style=flat-square)](https://github.com/AhmedRoza/NeverSleep/releases/latest)
 
-<img src="docs/screenshots/app-main.png" width="300" alt="Never Sleep main window"> &nbsp; <img src="docs/screenshots/app-contact.png" width="300" alt="Never Sleep Contact tab">
+<p align="center">
+  <img src="docs/screenshots/app-main.png" width="190" alt="Main window, dark">
+  <img src="docs/screenshots/app-devices.png" width="190" alt="Connected devices with battery levels">
+  <img src="docs/screenshots/app-light.png" width="190" alt="Main window, light">
+  <img src="docs/screenshots/app-contact.png" width="190" alt="Contact tab">
+</p>
+<p align="center"><sub>Screenshots use sample data.</sub></p>
 
-</div>
+## Highlights
 
-## Features / المميزات
+- **One-tap keep-awake.** A single power button. The app starts switched off and remembers your choices.
+- **Flexible timers.** Until you stop it, 1, 2 or 4 hours, any custom hours and minutes, or **until a clock time** such as 5:00 AM, with a live countdown.
+- **Laptop battery card.** A battery icon that is green and turns red at 20% or lower, the percentage, charging state, and the time left or time to full.
+- **Connected devices with their own battery.** Headphones, mice, keyboards, phones and other Bluetooth devices appear with a small battery icon and percentage, green normally and red when low.
+- **Tray icon you can read at a glance.** Left-click switches keep-awake on or off. A green open eye means awake, a grey closed eye means off. Hovering shows the state, the time and the battery.
+- **Smart sleep.** Switches keep-awake off by itself inside a night window you choose, and leaves it off until you start it again.
+- **Windows uptime counter** on the main screen.
+- **Quiet startup.** Optionally launches with Windows straight into the tray, with no window.
+- **On charger only** option, which stops keeping the PC awake when the charger is unplugged.
+- **Dark AMOLED or light theme** and a custom accent color.
+- **Automatic updates from GitHub Releases**, with a "check now" button. You can switch them off.
+- **Built-in performance readout.** A tray menu item shows the app's own memory and CPU use.
 
-- **One tap to keep awake** with a single animated power button. The app starts switched off and remembers your choices. / زرار واحد لمنع السكون، والبرنامج بيفتح متوقف.
-- **Keep the screen on too** (optional). / إبقاء الشاشة شغالة كمان (اختياري).
-- **Timer**: until stopped, 1, 2 or 4 hours, or any custom hours and minutes, with a live countdown. / مدة جاهزة أو مخصصة بعدّاد متبقي.
-- **Running-time counter**: shows how long keep-awake has been on (can be turned off). / عدّاد بيوريك بقاله شغال قد إيه.
-- **Dark AMOLED or white mode**, and a **custom accent color**. / وضع داكن AMOLED أو أبيض، ولون تمييز تغيّره.
-- **Starts with Windows quietly**: opens in the tray by the clock, with no window. / يفتح مع ويندوز في الخلفية جنب الساعة من غير نافذة.
-- **Tray menu**: open, start/stop, quick duration, start with Windows, stop and exit. / قائمة جنب الساعة.
-- **On charger only** option stops keeping the PC awake when the charger is unplugged. / على الشاحن بس.
-- **Automatic updates from GitHub Releases** (can be switched off). / تحديث تلقائي من GitHub (ممكن توقفه).
-- **Contact tab** (∞) with the developer's photo, Instagram and WhatsApp. / قسم Contact.
+## Install
 
-> **Status:** 2.0 is a first build. It was tested on a GitHub-hosted Windows VM (not a physical laptop). There, the tray, the WebView2 window, the keep-awake request (seen in `powercfg`), theme switching, a fresh install, quiet background start when the Start with Windows command was replayed (not a real Windows logon), the update swap with restart, rejection of a download with a wrong checksum, rollback of an update that failed to start, and migration from a simulated v1 install (settings kept, backup made) all worked. The final layout check and the migration check ran on the final build. The update, install and background tests ran on the previous build, which has identical program code and differs only in window layout. Not tested: a real reboot or Windows logon, real sleep or lid close on a laptop, SmartScreen, other DPI or very small window sizes, and laptop battery or CPU use. Screenshots in this README are mocked-state renders. The Contact tab label is English in the Arabic interface. Please report problems.
+1. Download `NeverSleep.exe` from [Releases](https://github.com/AhmedRoza/NeverSleep/releases/latest).
+2. Run it. It installs itself for your user (no admin rights) and adds Start Menu and Desktop shortcuts.
+3. The executable is not code-signed, so Windows SmartScreen may ask you to confirm on first run.
 
-Never Sleep is designed to prevent only *idle* sleep. It is not meant to bypass the lock screen, lid-close behavior, or any Windows power or security policy. / بيمنع سكون الخمول بس، ومبيعدّيش قفل الشاشة ولا إغلاق الغطا.
+Upgrading from 1.x or 2.0 keeps your settings. If the older Electron version is found, the installer asks before touching it and moves the old folder to a backup folder next to it.
 
-## Install / التثبيت
+The window uses the Microsoft Edge **WebView2 runtime**, which ships with Windows 11 and up-to-date Windows 10. If it is missing, the app says so and the tray part keeps working.
 
-1. Download `NeverSleep.exe` from [Releases](../../releases).
-2. Run it. It installs itself for your user (no admin needed) and adds a Start Menu and Desktop shortcut.
-3. The app is not code-signed, so Windows may show a SmartScreen prompt on first run.
+## Device batteries
 
-If you have the older v1.x (Electron) version, the installer asks before touching it. The old folder is moved to a backup folder next to it and your settings are kept.
+Windows shows a battery level only for devices that report one to Windows itself. In practice:
 
-Needs the Microsoft Edge **WebView2 runtime** for the window (included with Windows 11 and most up-to-date Windows 10). If it is missing, the app shows a message telling you to install it from Microsoft; the tray part still runs.
+| Device | Battery shown |
+| --- | --- |
+| Bluetooth headphones, earbuds, speakers that expose a battery value | Yes |
+| Bluetooth mice and keyboards | Yes, when they expose a battery value |
+| Phones connected over Bluetooth | Yes, when the phone reports it |
+| Wired devices (USB mouse, keyboard, flash drive) | No, they have no battery |
+| Mice and keyboards on a 2.4 GHz USB dongle | Usually no. Those use vendor protocols that Windows does not read |
 
-## Updates / التحديثات
+Device data is read only while the window is open, cached for 30 seconds, and refreshed when Windows reports a device change.
 
-When *Automatic updates* is on, the app is designed to check this repository's latest release every few hours. A new build must be a newer version with a `NeverSleep.exe` and a matching `NeverSleep.exe.sha256` file. It is installed only while keep-awake is off, and the previous build is kept as `Never Sleep.exe.old` so a failing update can roll back (rollback of an update that failed to start was tested on a Windows VM).
+## Light on the machine
 
-Note: the checksum only catches broken or mismatched downloads. It does not prove who published the file. Anyone who can publish a release on this GitHub account could push code to installed copies, so updates are only as trustworthy as that account. The builds are not code-signed. Turn the option off in the app if you prefer manual updates.
+- One small process in the tray. The window is a separate WebView2 process that only exists while it is open, so a closed window costs nothing.
+- One scheduler loop in the whole app. It sleeps 20 seconds while idle and wakes exactly when a countdown ends.
+- The battery is a single `GetSystemPowerStatus` call. Devices come from SetupAPI, with no PowerShell, WMI or COM.
+- The hover popup is created once, painted only while visible, and refreshes once a second only while the pointer is over the icon.
+- The performance readout (tray menu, "RAM and CPU") reads the numbers only when you ask and saves them to `stats.txt` next to the settings file.
+
+## Safety
+
+Never Sleep prevents only *idle* sleep. It does not bypass the lock screen, lid-close behavior, or any Windows power or security policy.
+
+## Updates
+
+With *Automatic updates* on, the app checks this repository's latest release shortly after start and then every six hours. A new build must be a newer version with a `NeverSleep.exe` and a matching `NeverSleep.exe.sha256`, and it must pass its own `--selftest` (settings load, power request round trip, battery read, device enumeration) before it may replace the running copy. If the new copy fails to start, the previous one is restored.
+
+The checksum catches broken or mismatched downloads. It does not prove who published the file, so updates are only as trustworthy as this GitHub account. Builds are not code-signed. Turn the option off in the app if you prefer manual updates.
 
 ## Build from source
 
 ```bash
-./build.sh   # needs Go 1.22+, produces NeverSleep.exe and NeverSleep.exe.sha256
+./build.sh      # needs Go 1.22+, produces NeverSleep.exe and NeverSleep.exe.sha256
+go test ./...   # logic tests: settings, clocks, battery estimate, devices, updates, struct layouts
 ```
 
 ## How it is built
 
-Go with a small native tray and power host. The window is a separate WebView2 process that only exists while the window is open, so the tray part stays tiny. Settings are stored in `%APPDATA%\neversleep\settings.json`.
+Go with a small native tray, a native hover popup and a power host, all through the Windows API. The window is a separate WebView2 process. Settings live in `%APPDATA%\neversleep\settings.json` and are shared with v1.x and 2.0.
+
+## Testing status
+
+The logic (settings migration, clock and night-window maths, battery estimate, device filtering, update verification and Windows struct layouts) is covered by automated tests. Version 2.0 was also run on a Windows runner: tray, window, keep-awake request, theme switching, fresh install, quiet start, update with rollback and migration. The 2.1 additions (device list, device batteries, hover popup, performance readout) have had limited time on physical hardware so far. If something looks off on your machine, please [open an issue](https://github.com/AhmedRoza/NeverSleep/issues).
 
 ## Credits
 
-Ahmed Roza · [Instagram](https://www.instagram.com/ahmed_roza_) · [WhatsApp](https://wa.me/201095064150)
+Built by Ahmed Roza · [Instagram](https://www.instagram.com/ahmed_roza_) · [WhatsApp](https://wa.me/201095064150)

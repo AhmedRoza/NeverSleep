@@ -2,3 +2,5 @@
 *.syso
 dist/
 node_modules/
+/neversleep
+stats.txt
